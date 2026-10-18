@@ -1,0 +1,11 @@
+# Submit server .submit file for
+#  Course CMSC132_Fall26
+#  Project P3: Game Design Project
+
+courseName=CMSC132_Fall26
+semester=202608
+projectNumber=P3
+courseKey=cc1caafdeb0169a3
+authentication.type=cas
+baseURL=https://submit.cs.umd.edu:443/fall2026
+submitURL=https://submit.cs.umd.edu:443/fall2026/eclipse/SubmitProjectViaEclipse
