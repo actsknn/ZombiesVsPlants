@@ -15,7 +15,7 @@ NOTE: You don't need to worry about the "magic math" details.
 
 */
 
-class Polygon {
+public class Polygon {
   private Point[] shape;   // An array of points.
   public Point position;   // The offset mentioned above.
   public double rotation; // Zero degrees is due east.
@@ -101,4 +101,15 @@ class Polygon {
     double area = findArea();
     return new Point(Math.abs(sum.x/(6*area)),Math.abs(sum.y/(6*area)));
   }
+
+
+    public boolean collides(Polygon other){
+        Point[] points = getPoints();
+        for (Point p : points) {
+            if (other.contains(p)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
