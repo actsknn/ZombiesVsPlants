@@ -32,7 +32,7 @@ public class WallPlant extends Plant {
 
     /** Creates a unit at the supplied top-left position with starter stats. */
     public WallPlant(Point position) {
-        super(PixelArt.outline(), position, 350, 0, 0, 90, 1.0);
+        super(PixelArt.outline(), position, 150, 0, 0, 90, 1.0);
     }
 
     /** Draws this unit at its current position and rotation. */

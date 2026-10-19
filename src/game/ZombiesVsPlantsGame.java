@@ -3,38 +3,40 @@ package game;
 /*
 CLASS: ZombieVsPlantsGame
 
-DESCRIPTION: Main game class extending Game.
+        DESCRIPTION: Main game class extending Game.
 
-NOTE: This class is the metaphorical "main method" of your program,
-      it is your control center.
-*/
+        NOTE: This class is the metaphorical "main method" of your program,
+        it is your control center.
+         */
 
 import game.units.Plant;
+import game.units.Pea;
 import game.units.Zombie;
+import game.units.plants.LayoutType;
 import game.units.zombies.BasicZombie;
 import game.units.zombies.FastZombie;
 import game.units.zombies.TankZombie;
 import game.units.zombies.ZombieType;
-import game.units.plants.LayoutType;
-
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 
 class ZombiesVsPlantsGame extends Game {
-
     private static final int STARTING_MOONLIGHT = 250;
+    private static final int WAVES_PER_LEVEL = 3;
+    private static final int TOTAL_LEVELS = 3;
+    private static final int PLANNING_SECONDS = 30;
 
     private int level;
     private int wave;
     private Phase phase;
     private boolean gameComplete;
     private boolean initialized;
-    private long lastPlantStrategyTime;
 
     private ArrayList<Zombie> zombies;
     private ArrayList<Zombie> prepZombies;
     private ArrayList<Plant> plants;
+    private ArrayList<Pea> peas;
 
     private DeploymentCursor cursor;
     private PlantLayoutSelector layoutSelector;
@@ -45,11 +47,11 @@ class ZombiesVsPlantsGame extends Game {
 
     private int moonlight = STARTING_MOONLIGHT;
     private ZombieType selectedZombie = ZombieType.BASIC;
+    private Zombie previewZombie;
 
     static int counter = 0;
 
     public ZombiesVsPlantsGame() {
-
         super("ZombiesVsPlants!", 1200, 750);
 
         this.setFocusable(true);
@@ -58,37 +60,35 @@ class ZombiesVsPlantsGame extends Game {
         level = 1;
         wave = 1;
 
-        // The level starts in the Free phase.
-        phase = Phase.FREE;
+        // The level starts in the Planning phase.
+        phase = Phase.PLANNING;
         gameComplete = false;
-        lastPlantStrategyTime = System.currentTimeMillis();
 
         zombies = new ArrayList<Zombie>();
         prepZombies = new ArrayList<Zombie>();
         plants = new ArrayList<Plant>();
+        peas = new ArrayList<Pea>();
 
         battlefield = new Battlefield();
         deploymentMenu = new DeploymentMenu();
         layoutSelector = new PlantLayoutSelector();
 
         cursor = new DeploymentCursor(
-            new Point[] {
-                new Point(0, 0),
-                new Point(20, 0),
-                new Point(20, 20),
-                new Point(0, 20)
-            },
-            new Point(85, 160),
-            0
-        );
+        new Point[] {
+            new Point(0, 0),
+                    new Point(20, 0),
+                    new Point(20, 20),
+                    new Point(0, 20)
+        },
+                new Point(85, 160),
+                0);
 
         inputHandler = new InputHandler();
         waveTimer = new WaveTimer();
+        previewZombie = createZombie(selectedZombie, new Point(0, 0));
 
         this.addKeyListener(inputHandler);
-
-        createInitialPlantLayout();
-        waveTimer.start(60);
+        beginPlanning();
         initialized = true;
 
         this.addMouseListener(new MouseAdapter() {
@@ -123,7 +123,6 @@ class ZombiesVsPlantsGame extends Game {
      * plants, zombies, and win screen.
      */
     public void paint(Graphics brush) {
-
         // AWT may request a paint while the constructor is still running.
         if (!initialized) {
             return;
@@ -134,144 +133,96 @@ class ZombiesVsPlantsGame extends Game {
 
         battlefield.paint(brush);
 
-        deploymentMenu.paint(
-            brush,
-            moonlight,
-            selectedZombie
-        );
+        deploymentMenu.paint(brush, moonlight, selectedZombie);
 
         // Show current level and wave.
         brush.setFont(new Font("Arial", Font.BOLD, 25));
-        brush.drawString(
-            "Level " + level + "  Wave " + wave,
-            950,
-            50
-        );
+        brush.drawString("Level " + level + "  Wave " + wave, 950, 50);
 
         // Draw plants.
         for (Plant plant : plants) {
-
             if (!plant.isDead()) {
                 plant.paint(brush);
             }
         }
 
+        // Draw peas.
+        for (Pea pea : peas) {
+            pea.paint(brush);
+        }
+
         // Draw zombies.
         for (Zombie zombie : zombies) {
-
             if (!zombie.isDead()) {
                 zombie.paint(brush);
             }
         }
 
-        // Draw zombies waiting in Prep.
+        // Draw zombies waiting in Planning.
         for (Zombie zombie : prepZombies) {
-
             if (!zombie.isDead()) {
                 zombie.paint(brush);
             }
         }
 
-        // Draw deployment cursor during Free and Prep.
-        if (phase == Phase.FREE || phase == Phase.PREP) {
-            cursor.paint(brush);
+        // Draw deployment cursor during Planning.
+        if (phase == Phase.PLANNING) {
+            cursor.paint(brush, moonlight >= selectedZombie.getCost());
+            paintZombiePreview(brush);
+            brush.setFont(new Font("Dialog", Font.PLAIN, 14));
+            brush.drawString("WASD / arrows: move   Enter: place   Backspace: refund   Space: start wave",
+                    Battlefield.BOARD_X, Battlefield.BOARD_Y + Battlefield.BOARD_HEIGHT + 35);
         }
 
-        // Draw win screen.
-        if (phase == Phase.LEVEL_END) {
+        if (phase == Phase.WAVE_END) {
+            brush.setFont(new Font("Arial", Font.BOLD, 40));
+            brush.drawString("WAVE " + wave + " COMPLETE!", 375, 350);
+            brush.setFont(new Font("Arial", Font.PLAIN, 25));
+            brush.drawString("Press ENTER to plan wave " + (wave + 1), 390, 400);
+        }
 
-            brush.setFont(
-                new Font("Arial", Font.BOLD, 50)
-            );
+        // Draw level results after all three waves have succeeded.
+        if (phase == Phase.LEVEL_END && !gameComplete) {
+            brush.setFont(new Font("Arial", Font.BOLD, 50));
 
-            brush.drawString(
-                "YOU WIN!",
-                500,
-                350
-            );
+            brush.drawString("LEVEL COMPLETE!", 375, 350);
 
-            brush.setFont(
-                new Font("Arial", Font.PLAIN, 25)
-            );
+            brush.setFont(new Font("Arial", Font.PLAIN, 25));
 
-            brush.drawString(
-                "Zombie reached the Brain!",
-                440,
-                400
-            );
+            brush.drawString("All " + WAVES_PER_LEVEL + " waves completed!", 425, 400);
 
-            if (level < 3) {
-
-                brush.drawString(
-                    "Press ENTER for the next level",
-                    425,
-                    450
-                );
+            if (level < TOTAL_LEVELS) {
+                brush.drawString("Press ENTER for the next level", 425, 450);
+            } else {
+                brush.drawString("Press ENTER to finish the game", 425, 450);
             }
+
         }
 
-        if (phase == Phase.FREE ||
-                phase == Phase.PREP ||
-                phase == Phase.WAVE) {
-
-                String phaseText;
-
-                if (phase == Phase.FREE) {
-                    phaseText = "FREE";
-                } else if (phase == Phase.PREP) {
-                    phaseText = "PREP";
-                } else {
-                    phaseText = "WAVE";
-                }
-
-                brush.setFont(
-                    new Font("Arial", Font.BOLD, 25)
-                );
-
-                brush.drawString(
-                    phaseText + "  Time: "
-                    + waveTimer.getRemainingSeconds(),
-                    950,
-                    80
-                );
+        if (phase == Phase.PLANNING || phase == Phase.WAVE) {
+            String phaseText = phase == Phase.PLANNING
+                    ? "Planning: " + waveTimer.getRemainingSeconds() : "Wave in progress";
+            brush.setFont(new Font("Arial", Font.BOLD, 25));
+            brush.drawString(phaseText, 950, 80);
         }
-
         if (phase == Phase.LOSE) {
-
             brush.setFont(new Font("Arial", Font.BOLD, 40));
 
-            brush.drawString(
-                "YOU LOSE",
-                350,
-                300
-            );
+            brush.drawString("YOU LOSE", 350, 300);
 
             brush.setFont(new Font("Arial", Font.BOLD, 20));
 
-            brush.drawString(
-                "Press ENTER to return to Level 1",
-                300,
-                350
-            );
+            brush.drawString("Press ENTER to return to Level 1", 300, 350);
         }
 
         if (gameComplete) {
-
             brush.setFont(new Font("Arial", Font.BOLD, 40));
 
-            brush.drawString(
-                "GAME COMPLETE!",
-                300,
-                300
-            );
+            brush.drawString("GAME COMPLETE!", 300, 300);
 
             brush.setFont(new Font("Arial", Font.BOLD, 20));
 
-            brush.drawString(
-                "You completed all 3 levels!",
-                300,
-                350
-            );
+            brush.drawString("You completed all 3 levels!", 300, 350);
         }
     }
 
@@ -279,59 +230,22 @@ class ZombiesVsPlantsGame extends Game {
      * Updates the game state during the Wave phase.
      */
     public void updateGame() {
-
-        if (phase == Phase.FREE || phase == Phase.WAVE) {
-
-            long currentTime = System.currentTimeMillis();
-
-            if (currentTime - lastPlantStrategyTime >= 15000) {
-
-                if (plants.size() < 45) {
-
-                    LayoutType layoutType =
-                            layoutSelector.analyzeZombies(zombies);
-
-                    ArrayList<Plant> newPlants =
-                            layoutSelector.createLayout(
-                                    layoutType,
-                                    wave,
-                                    plants,
-                                    zombies
-                            );
-
-                    plants.addAll(newPlants);
+        if (phase == Phase.PLANNING) {
+            if (waveTimer.isFinished()) {
+                if (prepZombies.isEmpty()) {
+                    waveTimer.start(PLANNING_SECONDS);
+                } else {
+                    startWave();
                 }
-
-                lastPlantStrategyTime = currentTime;
             }
+            return;
         }
-
-        // Handle Free and Prep timers.
-        if (phase == Phase.FREE) {
-
-            if (waveTimer.isFinished()) {
-
-                phase = Phase.PREP;
-
-                waveTimer.start(30);
-            }
-
-        } else if (phase == Phase.PREP) {
-
-            if (waveTimer.isFinished()) {
-
-                startWave();
-            }
-        }
-
-        // No combat during Prep.
-        if (phase != Phase.FREE && phase != Phase.WAVE) {
+        if (phase != Phase.WAVE) {
             return;
         }
 
         // Update zombie cooldowns and movement.
         for (Zombie zombie : zombies) {
-
             if (zombie.isDead()) {
                 continue;
             }
@@ -341,18 +255,13 @@ class ZombiesVsPlantsGame extends Game {
             boolean blocked = false;
 
             for (Plant plant : plants) {
-
                 if (plant.isDead()) {
                     continue;
                 }
 
-                double xDistance = Math.abs(
-                        zombie.position.x - plant.position.x
-                );
+                double xDistance = Math.abs(zombie.position.x - plant.position.x);
 
-                double yDistance = Math.abs(
-                        zombie.position.y - plant.position.y
-                );
+                double yDistance = Math.abs(zombie.position.y - plant.position.y);
 
                 /*
                  * A zombie is blocked when it reaches
@@ -360,7 +269,6 @@ class ZombiesVsPlantsGame extends Game {
                  * to the plant.
                  */
                 if (xDistance <= 30 && yDistance <= 50) {
-
                     blocked = true;
 
                     boolean wasAlive = !plant.isDead();
@@ -382,7 +290,6 @@ class ZombiesVsPlantsGame extends Game {
 
         // Update plant cooldowns and attacks.
         for (Plant plant : plants) {
-
             if (plant.isDead()) {
                 continue;
             }
@@ -393,41 +300,56 @@ class ZombiesVsPlantsGame extends Game {
             double closestDistance = Double.MAX_VALUE;
 
             for (Zombie zombie : zombies) {
-
                 if (zombie.isDead()) {
                     continue;
                 }
 
                 // Plants can only attack zombies in the same lane.
-                double laneDistance = Math.abs(
-                    zombie.position.y - plant.position.y
-                );
+                double laneDistance = Math.abs(zombie.position.y - plant.position.y);
 
                 if (laneDistance > 50) {
                     continue;
                 }
 
                 // Check horizontal attack range.
-                double distance = Math.abs(
-                    zombie.position.x - plant.position.x
-                );
+                double distance = Math.abs(zombie.position.x - plant.position.x);
 
                 if (distance <= plant.getAttackRange()
-                        && distance < closestDistance) {
-
+                && distance < closestDistance) {
                     closestDistance = distance;
                     target = zombie;
                 }
             }
 
             if (target != null) {
-                plant.attack(target);
+                Pea pea = plant.shoot();
+                if (pea != null) {
+                    peas.add(pea);
+                }
+            }
+        }
+
+        // Work backward so removing a pea does not skip the next one.
+        for (int i = peas.size() - 1; i >= 0; i--) {
+            Pea pea = peas.get(i);
+            pea.move();
+
+            boolean hit = false;
+            for (Zombie zombie : zombies) {
+                if (!zombie.isDead() && pea.collides(zombie)) {
+                    zombie.takeDamage(pea.getDamage());
+                    hit = true;
+                    break;
+                }
+            }
+
+            if (hit || pea.position.x + Pea.SIZE < Battlefield.BOARD_X) {
+                peas.remove(i);
             }
         }
 
         // Update zombie death animations.
         for (Zombie zombie : zombies) {
-
             if (zombie.isDead()) {
                 zombie.updateDeathAnimation();
             }
@@ -435,106 +357,72 @@ class ZombiesVsPlantsGame extends Game {
 
         // Update plant death animations.
         for (Plant plant : plants) {
-
             if (plant.isDead()) {
                 plant.updateDeathAnimation();
             }
         }
 
-        if (waveTimer.isFinished()) {
-            nextWave();
-            return;
-        }
-
         // Check whether a zombie reached the Brain.
         if (checkWin()) {
-
-            phase = Phase.LEVEL_END;
+            phase = wave < WAVES_PER_LEVEL ? Phase.WAVE_END : Phase.LEVEL_END;
+        } else if (checkLose()) {
+            phase = Phase.LOSE;
         }
     }
 
     /**
      * Starts the current Wave.
      *
-     * The Wave can only start from the Prep phase.
+     * The Wave can only start from the Planning phase.
      */
     public void startWave() {
-
-        if (phase != Phase.PREP) {
+        if (phase != Phase.PLANNING || prepZombies.isEmpty()) {
             return;
         }
 
-        /*
-         * Move all zombies from the deployment board
-         * to the battlefield.
-         */
-        for (Zombie zombie : prepZombies) {
-
-            double deploymentX = zombie.position.x;
-
-            // Convert deployment-board position to battlefield position.
-            double battlefieldX =
-                    Battlefield.BOARD_X
-                    + Battlefield.DEPLOYMENT_WIDTH
-                    + 20
-                    + (deploymentX - 85);
-
-            zombie.position.x = battlefieldX;
-        }
-
-        // Release all Prep zombies at the same time.
         zombies.addAll(prepZombies);
         prepZombies.clear();
+        createInitialPlantLayout();
 
         phase = Phase.WAVE;
-
-        // Temporary Wave test time.
-        waveTimer.start(30);
     }
 
-    /**
-     * Moves to the next Wave or next Level.
-     */
+    /** Advances after a successful wave and resets the board for planning. */
     public void nextWave() {
-
-        // Wave 1 -> Wave 2
-        if (wave == 1) {
-            wave = 2;
-            phase = Phase.FREE;
-            waveTimer.start(60);
+        if (phase != Phase.WAVE_END || wave >= WAVES_PER_LEVEL) {
             return;
         }
+        wave++;
+        beginPlanning();
+    }
 
-        // Wave 2 -> Wave 3
-        if (wave == 2) {
-            wave = 3;
-            phase = Phase.FREE;
-            waveTimer.start(60);
-            return;
-        }
-
-        // Wave 3 ends without reaching the Brain -> Lose
-        if (wave == 3) {
-            phase = Phase.LOSE;
-            waveTimer.reset();
-        }
+    /** Starts a fresh planning phase with a cleared board and a new budget. */
+    private void beginPlanning() {
+        zombies.clear();
+        prepZombies.clear();
+        plants.clear();
+        peas.clear();
+        if(wave == 1){
+			moonlight = STARTING_MOONLIGHT;
+		}
+		else moonlight += STARTING_MOONLIGHT;
+        gameComplete = false;
+        phase = Phase.PLANNING;
+        waveTimer.start(PLANNING_SECONDS);
     }
 
     /**
      * Checks whether a zombie has reached the Brain.
      */
     private boolean checkWin() {
-
         for (Zombie zombie : zombies) {
-
             if (zombie.isDead()) {
                 continue;
             }
 
             // Brain is on the right side of the battlefield.
             if (zombie.position.x >= Battlefield.BOARD_X
-                    + Battlefield.BOARD_WIDTH) {
-
+            + Battlefield.BOARD_WIDTH) {
                 return true;
             }
         }
@@ -546,13 +434,11 @@ class ZombiesVsPlantsGame extends Game {
      * Checks whether all zombies have died.
      */
     public boolean checkLose() {
-
         if (zombies.isEmpty()) {
             return false;
         }
 
         for (Zombie zombie : zombies) {
-
             if (!zombie.isDead()) {
                 return false;
             }
@@ -565,17 +451,10 @@ class ZombiesVsPlantsGame extends Game {
      * Creates the initial plant layout.
      */
     private void createInitialPlantLayout() {
+        LayoutType layoutType = layoutSelector.analyzeZombies(zombies);
 
-        LayoutType layoutType =
-                layoutSelector.analyzeZombies(zombies);
-
-        ArrayList<Plant> newPlants =
-                layoutSelector.createLayout(
-                        layoutType,
-                        wave,
-                        plants,
-                        zombies
-                );
+        ArrayList<Plant> newPlants = 
+			layoutSelector.createLayout(layoutType, level, wave);
 
         plants.addAll(newPlants);
     }
@@ -584,80 +463,82 @@ class ZombiesVsPlantsGame extends Game {
      * Places the currently selected zombie.
      */
     private void placeSelectedZombie() {
-
-        // Zombies can only be summoned during Free or Prep.
-        if (phase != Phase.FREE && phase != Phase.PREP) {
+        if (phase != Phase.PLANNING || moonlight < selectedZombie.getCost()) {
             return;
         }
-
-        int cost = selectedZombie.getCost();
-
-        if (moonlight < cost) {
+        if (getZombieInSelectedCell() != null) {
             return;
         }
+        Zombie zombie = createZombie(selectedZombie, getDeploymentPosition());
+        if (zombie != null) {
+            if (prepZombies.isEmpty() && waveTimer.isFinished()) {
+                waveTimer.start(PLANNING_SECONDS);
+            }
+            prepZombies.add(zombie);
+            moonlight -= selectedZombie.getCost();
+        }
+    }
 
-        double spawnX;
-        double spawnY;
+    /** Returns the sprite position centered in the selected deployment cell. */
+    private Point getDeploymentPosition() {
+        int cellWidth = Battlefield.DEPLOYMENT_WIDTH / 2;
+        int cellHeight = Battlefield.BOARD_HEIGHT / Battlefield.NUM_LANES;
+        return new Point(
+                Battlefield.BOARD_X + cursor.getColumn() * cellWidth + (cellWidth - 48) / 2,
+                Battlefield.BOARD_Y + cursor.getRow() * cellHeight + (cellHeight - 60) / 2);
+    }
 
-        if (phase == Phase.FREE) {
-
-            // Free-time zombies enter from the left side
-            // of the actual battlefield.
-            spawnX = Battlefield.BOARD_X
-                    + Battlefield.DEPLOYMENT_WIDTH
-                    + 20;
-
-            spawnY = Battlefield.BOARD_Y
-                    + cursor.getRow() * 100
-                    + 20;
-
-        } else {
-
-            // Prep zombies are stored on the deployment board.
-            spawnX = cursor.position.x;
-
-            spawnY = cursor.position.y;
-
-            for (Zombie queued : prepZombies) {
-                if (queued.position.x == spawnX && queued.position.y == spawnY) {
-                    return;
-                }
+    /** Finds a queued zombie in the highlighted cell. */
+    private Zombie getZombieInSelectedCell() {
+        Point position = getDeploymentPosition();
+        for (Zombie zombie : prepZombies) {
+            if (zombie.position.x == position.x && zombie.position.y == position.y) {
+                return zombie;
             }
         }
+        return null;
+    }
 
-        Point spawnPosition = new Point(
-                spawnX,
-                spawnY
-        );
+    /** Paints a separate ghost sprite without placing or activating it. */
+    private void paintZombiePreview(Graphics brush) {
+        if (getZombieInSelectedCell() != null) {
+            return;
+        }
+        previewZombie.position = getDeploymentPosition();
+        Graphics2D ghostBrush = (Graphics2D) brush.create();
+        ghostBrush.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.45f));
+        previewZombie.paint(ghostBrush);
+        ghostBrush.dispose();
+    }
 
-        Zombie zombie = createZombie(
-                selectedZombie,
-                spawnPosition
-        );
-
+    /** Removes a queued zombie and refunds its own type's cost. */
+    private void removeSelectedZombie() {
+        if (phase != Phase.PLANNING) {
+            return;
+        }
+        Zombie zombie = getZombieInSelectedCell();
         if (zombie == null) {
             return;
         }
-
-        if (phase == Phase.FREE) {
-
-            zombies.add(zombie);
-
-        } else if (phase == Phase.PREP) {
-
-            prepZombies.add(zombie);
+        if (zombie instanceof BasicZombie) {
+            moonlight += ZombieType.BASIC.getCost();
+        } else if (zombie instanceof FastZombie) {
+            moonlight += ZombieType.FAST.getCost();
+        } else if (zombie instanceof TankZombie) {
+            moonlight += ZombieType.TANK.getCost();
         }
-
-        moonlight -= cost;
+        prepZombies.remove(zombie);
     }
 
+    /** Changes the selected zombie and refreshes the preview. */
+    private void selectZombie(ZombieType type) {
+        selectedZombie = type;
+        previewZombie = createZombie(type, getDeploymentPosition());
+    }
     /**
      * Creates a zombie based on the selected type.
      */
-    private Zombie createZombie(
-            ZombieType type,
-            Point position) {
-
+    private Zombie createZombie(ZombieType type, Point position) {
         if (type == ZombieType.BASIC) {
             return new BasicZombie(position);
         }
@@ -677,36 +558,29 @@ class ZombiesVsPlantsGame extends Game {
      * Handles keyboard input.
      */
     private class InputHandler implements KeyListener {
-
         @Override
         public void keyPressed(KeyEvent e) {
-
+            if (gameComplete) {
+                return;
+            }
+            if (phase == Phase.WAVE_END) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    nextWave();
+                    repaint();
+                }
+                return;
+            }
             /*
              * If the level is over, Enter starts
              * the next level.
              */
             if (phase == Phase.LEVEL_END) {
-
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-
                     // Level 1 or Level 2: start the next level
-                    if (level < 3) {
-
+                    if (level < TOTAL_LEVELS) {
                         level++;
                         wave = 1;
-
-                        zombies.clear();
-                        plants.clear();
-                        prepZombies.clear();
-                        lastPlantStrategyTime = System.currentTimeMillis();
-
-                        moonlight = STARTING_MOONLIGHT;
-
-                        phase = Phase.FREE;
-
-                        createInitialPlantLayout();
-
-                        waveTimer.start(60);
+                        beginPlanning();
 
                         repaint();
 
@@ -724,24 +598,10 @@ class ZombiesVsPlantsGame extends Game {
              * to Level 1.
              */
             if (phase == Phase.LOSE) {
-
                 if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-
                     level = 1;
                     wave = 1;
-
-                    zombies.clear();
-                    plants.clear();
-                    prepZombies.clear();
-                    lastPlantStrategyTime = System.currentTimeMillis();
-
-                    moonlight = STARTING_MOONLIGHT;
-
-                    phase = Phase.FREE;
-
-                    createInitialPlantLayout();
-
-                    waveTimer.start(60);
+                    beginPlanning();
 
                     repaint();
                 }
@@ -750,17 +610,16 @@ class ZombiesVsPlantsGame extends Game {
             }
 
             switch (e.getKeyCode()) {
-
                 case KeyEvent.VK_1:
-                    selectedZombie = ZombieType.BASIC;
+                    selectZombie(ZombieType.BASIC);
                     break;
 
                 case KeyEvent.VK_2:
-                    selectedZombie = ZombieType.FAST;
+                    selectZombie(ZombieType.FAST);
                     break;
 
                 case KeyEvent.VK_3:
-                    selectedZombie = ZombieType.TANK;
+                    selectZombie(ZombieType.TANK);
                     break;
 
                 case KeyEvent.VK_W:
@@ -784,18 +643,14 @@ class ZombiesVsPlantsGame extends Game {
                     break;
 
                 case KeyEvent.VK_SPACE:
-                    placeSelectedZombie();
-                    break;
-
-                case KeyEvent.VK_ENTER:
-
-                    /*
-                     * Enter only starts a Wave from Prep.
-                     * It cannot skip a Wave.
-                     */
                     startWave();
                     break;
-
+                case KeyEvent.VK_ENTER:
+                    placeSelectedZombie();
+                    break;
+                case KeyEvent.VK_BACK_SPACE:
+                    removeSelectedZombie();
+                    break;
                 default:
                     return;
             }
@@ -816,7 +671,6 @@ class ZombiesVsPlantsGame extends Game {
      * Controls Wave timing.
      */
     private class WaveTimer {
-
         private long endTime;
 
         /**
@@ -838,9 +692,7 @@ class ZombiesVsPlantsGame extends Game {
          * Returns the remaining time in seconds.
          */
         public int getRemainingSeconds() {
-
-            long remaining =
-                    endTime - System.currentTimeMillis();
+            long remaining = endTime - System.currentTimeMillis();
 
             if (remaining <= 0) {
                 return 0;
@@ -858,7 +710,6 @@ class ZombiesVsPlantsGame extends Game {
     }
 
     public static void main(String[] args) {
-
         EventQueue.invokeLater(() -> {
             ZombiesVsPlantsGame game = new ZombiesVsPlantsGame();
             game.repaint();

@@ -1,9 +1,8 @@
 package game.units;
 
-import java.awt.Graphics;
-
 import game.Point;
 import game.Polygon;
+import java.awt.Graphics;
 
 public class Plant extends Polygon implements Combatant {
 
@@ -51,6 +50,18 @@ public class Plant extends Polygon implements Combatant {
         }
 
         currentCooldown = attackCooldown;
+    }
+
+    public Pea shoot(){
+        if(dying || damage <= 0 || currentCooldown > 0){
+            return null;
+        }
+
+        currentCooldown = attackCooldown;
+
+        Point muzz = new Point(position.x - Pea.SIZE, position.y + 21);
+
+        return new Pea(muzz, damage);
     }
 
     /**
@@ -120,8 +131,7 @@ public class Plant extends Polygon implements Combatant {
         brush.drawString(
                 "HP: " + currentHP,
                 (int) position.x,
-                (int) position.y - 5
-            );
+                (int) position.y - 5);
    }
 
 

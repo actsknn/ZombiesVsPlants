@@ -1,7 +1,10 @@
 package game;
 
 import game.units.zombies.ZombieType;
+import java.awt.BasicStroke;
+import java.awt.Color;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
 
 public class DeploymentCursor extends Polygon {
 
@@ -66,16 +69,30 @@ public class DeploymentCursor extends Polygon {
     }
 
     public void paint(Graphics brush) {
-        Point[] points = getPoints();
+        paint(brush, true);
+    }
 
-        int[] x = new int[points.length];
-        int[] y = new int[points.length];
+    /** Highlights the cell in red when the selected unit is too expensive. */
+    public void paint(Graphics brush, boolean affordable) {
+        int cellWidth = Battlefield.DEPLOYMENT_WIDTH / 2;
+        int cellHeight = Battlefield.BOARD_HEIGHT / Battlefield.NUM_LANES;
 
-        for (int i = 0; i < points.length; i++) {
-            x[i] = (int) points[i].x;
-            y[i] = (int) points[i].y;
-        }
+        int x = Battlefield.BOARD_X + column * cellWidth;
+        int y = Battlefield.BOARD_Y + row * cellHeight;
 
-        brush.drawPolygon(x, y, points.length);
+        Graphics2D highlight = (Graphics2D) brush.create();
+
+        // Light tint inside the selected cell.
+        highlight.setColor(affordable
+                ? new Color(240, 215, 100, 45) : new Color(220, 85, 80, 45));
+        highlight.fillRect(x + 2, y + 2, cellWidth - 4, cellHeight - 4);
+
+        // Outline slightly inside the paving seams.
+        highlight.setColor(affordable
+                ? new Color(240, 215, 100) : new Color(220, 85, 80));
+        highlight.setStroke(new BasicStroke(2));
+        highlight.drawRect(x + 2, y + 2, cellWidth - 4, cellHeight - 4);
+
+        highlight.dispose();
     }
 }
