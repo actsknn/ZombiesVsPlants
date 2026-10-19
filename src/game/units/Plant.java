@@ -4,7 +4,7 @@ import game.Point;
 import game.Polygon;
 import java.awt.Graphics;
 
-public class Plant extends Polygon implements Combatant {
+public abstract class Plant extends Polygon implements Combatant {
 
     private int maxHP;
     private int currentHP;
@@ -12,6 +12,7 @@ public class Plant extends Polygon implements Combatant {
     private double attackRange;
     private int attackCooldown;
     private boolean dying;
+    private int deathFrames;
     private double scale;
 
     private int currentCooldown;
@@ -31,25 +32,6 @@ public class Plant extends Polygon implements Combatant {
         this.scale = scale;
 
         this.currentCooldown = 0;
-    }
-
-    /**
-     * Attacks a zombie.
-     */
-    public void attack(Zombie z) {
-        if (dying || z == null || z.isDead()) {
-            return;
-        }
-
-        if (currentCooldown > 0) {
-            return;
-        }
-
-        if (damage > 0) {
-            z.takeDamage(damage);
-        }
-
-        currentCooldown = attackCooldown;
     }
 
     public Pea shoot(){
@@ -77,7 +59,6 @@ public class Plant extends Polygon implements Combatant {
 
         if (currentHP <= 0) {
             currentHP = 0;
-            dying = true;
             die();
         }
     }
@@ -101,7 +82,17 @@ public class Plant extends Polygon implements Combatant {
      * Updates the plant's death animation.
      */
     public void updateDeathAnimation() {
-        // Death animation will be added later.
+        if (dying && deathFrames <= 30) {
+            if (deathFrames < 30) {
+                rotate(-3);
+            }
+            deathFrames++;
+        }
+    }
+
+    /** Returns true after the quarter-turn has been displayed. */
+    public boolean isDeathAnimationFinished() {
+        return dying && deathFrames > 30;
     }
 
     /**
@@ -113,27 +104,8 @@ public class Plant extends Polygon implements Combatant {
         }
     }
 
-    /**
-     * Draws the plant using its Polygon shape.
-     */
-    public void paint(Graphics brush) {
-        Point[] points = getPoints();
-
-        int[] x = new int[points.length];
-        int[] y = new int[points.length];
-
-        for (int i = 0; i < points.length; i++) {
-            x[i] = (int) points[i].x;
-            y[i] = (int) points[i].y;
-        }
-
-        brush.drawPolygon(x, y, points.length);
-        brush.drawString(
-                "HP: " + currentHP,
-                (int) position.x,
-                (int) position.y - 5);
-   }
-
+    /** Draws the specific plant sprite supplied by each subclass. */
+    public abstract void paint(Graphics brush);
 
     public int getDamage() {
         return damage;

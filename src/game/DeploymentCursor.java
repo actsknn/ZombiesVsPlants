@@ -1,6 +1,5 @@
 package game;
 
-import game.units.zombies.ZombieType;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Graphics;
@@ -10,14 +9,12 @@ public class DeploymentCursor extends Polygon {
 
     private int row;
     private int column;
-    private ZombieType selectedZombieType;
 
     public DeploymentCursor(Point[] shape, Point position, double rotation) {
         super(shape, position, rotation);
 
         row = 0;
         column = 0;
-        selectedZombieType = null;
     }
 
     public void moveUp() {
@@ -46,18 +43,6 @@ public class DeploymentCursor extends Polygon {
             column++;
             position.x += 90;
         }
-    }
-
-    public void select() {
-        // Selection will be handled by the game controller.
-    }
-
-    public void setSelectedZombieType(ZombieType zombieType) {
-        selectedZombieType = zombieType;
-    }
-
-    public ZombieType getSelectedZombieType() {
-        return selectedZombieType;
     }
 
     public int getRow() {

@@ -5,7 +5,7 @@ import java.awt.Graphics;
 import game.Point;
 import game.Polygon;
 
-public class Zombie extends Polygon implements Combatant {
+public abstract class Zombie extends Polygon implements Combatant {
 
     private int maxHP;
     private int currentHP;
@@ -16,6 +16,7 @@ public class Zombie extends Polygon implements Combatant {
     private int offenseScore;
     private int defenseScore;
     private boolean dying;
+    private int deathFrames;
     private double scale;
 
     private int currentCooldown;
@@ -82,7 +83,6 @@ public class Zombie extends Polygon implements Combatant {
 
         if (currentHP <= 0) {
             currentHP = 0;
-            dying = true;
             die();
         }
     }
@@ -106,7 +106,17 @@ public class Zombie extends Polygon implements Combatant {
      * Updates the zombie's death animation.
      */
     public void updateDeathAnimation() {
-        // Death animation will be added later.
+        if (dying && deathFrames <= 30) {
+            if (deathFrames < 30) {
+                rotate(-3);
+            }
+            deathFrames++;
+        }
+    }
+
+    /** Returns true after the quarter-turn has been displayed. */
+    public boolean isDeathAnimationFinished() {
+        return dying && deathFrames > 30;
     }
 
     /**
@@ -118,22 +128,8 @@ public class Zombie extends Polygon implements Combatant {
         }
     }
 
-    /**
-     * Draws the zombie using its Polygon shape.
-     */
-    public void paint(Graphics brush) {
-        Point[] points = getPoints();
-
-        int[] x = new int[points.length];
-        int[] y = new int[points.length];
-
-        for (int i = 0; i < points.length; i++) {
-            x[i] = (int) points[i].x;
-            y[i] = (int) points[i].y;
-        }
-
-        brush.drawPolygon(x, y, points.length);
-    }
+    /** Draws the specific zombie sprite supplied by each subclass. */
+    public abstract void paint(Graphics brush);
 
     public int getMaxHP() {
         return maxHP;

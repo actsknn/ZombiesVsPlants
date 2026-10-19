@@ -49,8 +49,6 @@ class ZombiesVsPlantsGame extends Game {
     private ZombieType selectedZombie = ZombieType.BASIC;
     private Zombie previewZombie;
 
-    static int counter = 0;
-
     public ZombiesVsPlantsGame() {
         super("ZombiesVsPlants!", 1200, 750);
 
@@ -141,7 +139,7 @@ class ZombiesVsPlantsGame extends Game {
 
         // Draw plants.
         for (Plant plant : plants) {
-            if (!plant.isDead()) {
+            if (!plant.isDeathAnimationFinished()) {
                 plant.paint(brush);
             }
         }
@@ -153,7 +151,7 @@ class ZombiesVsPlantsGame extends Game {
 
         // Draw zombies.
         for (Zombie zombie : zombies) {
-            if (!zombie.isDead()) {
+            if (!zombie.isDeathAnimationFinished()) {
                 zombie.paint(brush);
             }
         }
@@ -230,6 +228,8 @@ class ZombiesVsPlantsGame extends Game {
      * Updates the game state during the Wave phase.
      */
     public void updateGame() {
+        updateDeathAnimations();
+
         if (phase == Phase.PLANNING) {
             if (waveTimer.isFinished()) {
                 if (prepZombies.isEmpty()) {
@@ -271,11 +271,9 @@ class ZombiesVsPlantsGame extends Game {
                 if (xDistance <= 30 && yDistance <= 50) {
                     blocked = true;
 
-                    boolean wasAlive = !plant.isDead();
-
                     zombie.attack(plant);
 
-                    if (wasAlive && plant.isDead()) {
+                    if (plant.isDead()) {
                         moonlight += 25;
                     }
 
@@ -348,25 +346,29 @@ class ZombiesVsPlantsGame extends Game {
             }
         }
 
-        // Update zombie death animations.
-        for (Zombie zombie : zombies) {
-            if (zombie.isDead()) {
-                zombie.updateDeathAnimation();
-            }
-        }
-
-        // Update plant death animations.
-        for (Plant plant : plants) {
-            if (plant.isDead()) {
-                plant.updateDeathAnimation();
-            }
-        }
-
         // Check whether a zombie reached the Brain.
         if (checkWin()) {
             phase = wave < WAVES_PER_LEVEL ? Phase.WAVE_END : Phase.LEVEL_END;
         } else if (checkLose()) {
             phase = Phase.LOSE;
+        }
+    }
+
+    /** Finishes death turns even while a result screen is showing. */
+    private void updateDeathAnimations() {
+        for (int i = zombies.size() - 1; i >= 0; i--) {
+            Zombie zombie = zombies.get(i);
+            zombie.updateDeathAnimation();
+            if (zombie.isDeathAnimationFinished()) {
+                zombies.remove(i);
+            }
+        }
+        for (int i = plants.size() - 1; i >= 0; i--) {
+            Plant plant = plants.get(i);
+            plant.updateDeathAnimation();
+            if (plant.isDeathAnimationFinished()) {
+                plants.remove(i);
+            }
         }
     }
 
@@ -701,12 +703,6 @@ class ZombiesVsPlantsGame extends Game {
             return (int) Math.ceil(remaining / 1000.0);
         }
 
-        /**
-         * Resets the timer.
-         */
-        public void reset() {
-            endTime = 0;
-        }
     }
 
     public static void main(String[] args) {

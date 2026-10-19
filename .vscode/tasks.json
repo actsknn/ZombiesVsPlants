@@ -1,0 +1,34 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build game",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$sources = @(Get-ChildItem -LiteralPath src -Recurse -Filter '*.java' | ForEach-Object { $_.FullName }); New-Item -ItemType Directory -Force -Path bin | Out-Null; & javac --release 17 -d bin $sources; exit $LASTEXITCODE"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Run game",
+      "type": "process",
+      "command": "java",
+      "args": ["-cp", "bin", "game.ZombiesVsPlantsGame"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "dependsOn": "Build game",
+      "problemMatcher": []
+    }
+  ]
+}
