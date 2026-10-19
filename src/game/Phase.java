@@ -1,8 +1,9 @@
 package game;
 
 public enum Phase {
-    PLANNING,
+    FREE,
+    PREP,
     WAVE,
-    LEVEL_END
+    LEVEL_END,
+    LOSE
 }
-
