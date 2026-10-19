@@ -1,6 +1,6 @@
 # ZombiesVsPlants
 
-A CMSC132 Java game inspired by Plants vs. Zombies, with the player controlling the zombies. Plan a formation, spend moonlight to deploy units, and break through the plants to reach Dave's Brain.
+A Java game inspired by Plants vs. Zombies, with the player controlling the zombies. Plan a formation, spend moonlight to deploy units, and break through the plants to reach Dave's Brain.
 
 The game uses Java AWT, the provided `Game`, `Polygon`, and `Point` starter classes, and pixel-style characters drawn in code. No external libraries or image downloads are required.
 
@@ -78,9 +78,3 @@ Click the game board if it does not have keyboard focus.
 | `bin/` | Generated Java class files; ignored by Git |
 
 Edit the Java files under `src/`. The IDE or compiler generates the files under `bin/`.
-
-## Current status
-
-Implemented: planning and ghost previews, placement/refunds, moonlight carryover, all nine waves, fixed layouts for all three strategies, automatic movement, attack cooldowns, and visible peas with collision damage and cleanup.
-
-Remaining work includes forward-only shooter targeting, death animations with rotation and shrinking, health feedback, balance playtesting, and final Javadocs/UML and assignment-rubric checks.
