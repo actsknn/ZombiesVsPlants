@@ -1,5 +1,6 @@
 package game;
 
+import game.units.zombies.ZombieType;
 import java.awt.Graphics;
 
 public class DeploymentCursor extends Polygon {

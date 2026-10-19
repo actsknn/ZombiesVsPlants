@@ -7,13 +7,15 @@ NOTE: This class is the metaphorical "main method" of your program,
       it is your control center.
 
 */
+import game.units.Plant;
+import game.units.Zombie;
+import game.units.zombies.ZombieType;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
-import game.units.Plant;
-import game.units.Zombie;
 
 class ZombiesVsPlantsGame extends Game {
+    private static final int STARTING_MOONLIGHT = 250;
 	private int level;
 	private int wave;
 	private Phase phase;
@@ -23,26 +25,52 @@ class ZombiesVsPlantsGame extends Game {
 	private PlantLayoutSelector layoutSelector;
 	private InputHandler inputHandler;
 	private WaveTimer waveTimer;
+	private Battlefield battlefield;
+	private DeploymentMenu deploymentMenu;
+	private int moonlight = STARTING_MOONLIGHT;
+	private ZombieType selectedZombie = ZombieType.BASIC;
 
 	static int counter = 0;
 
   public ZombiesVsPlantsGame() {
-    super("ZombiesVsPlants!",800,600);
+    super("ZombiesVsPlants!", 1200, 750);
+
     this.setFocusable(true);
-	this.requestFocus();
-  }
+    this.requestFocus();
+
+    this.level = 1;
+    this.wave = 1;
+    this.phase = Phase.PLANNING;
+
+    this.zombies = new ArrayList<Zombie>();
+    this.plants = new ArrayList<Plant>();
+
+    this.battlefield = new Battlefield();
+    this.deploymentMenu = new DeploymentMenu();
+    this.layoutSelector = new PlantLayoutSelector();
+
+    this.cursor = new DeploymentCursor(
+        new Point[] {
+            new Point(0, 0),
+            new Point(20, 0),
+            new Point(20, 20),
+            new Point(0, 20)
+        },
+        new Point(150, 150),
+        0
+    );
+
+    this.inputHandler = new InputHandler();
+    this.waveTimer = new WaveTimer();
+
+    this.addKeyListener(inputHandler);
+}
   
 	public void paint(Graphics brush) {
-    	brush.setColor(Color.black);
-    	brush.fillRect(0,0,width,height);
-    	
-    	// sample code for printing message for debugging
-    	// counter is incremented and this message printed
-    	// each time the canvas is repainted
-    	counter++;
-    	brush.setColor(Color.white);
-    	brush.drawString("Counter is " + counter, 10, 10);
+		battlefield.paint(brush);
+		deploymentMenu.paint(brush, moonlight, selectedZombie);
   }
+
   
 	public void updateGame() {
 	}
@@ -64,6 +92,16 @@ class ZombiesVsPlantsGame extends Game {
 	private class InputHandler implements KeyListener {
 		@Override
 		public void keyPressed(KeyEvent e) {
+			if (phase != Phase.PLANNING) {
+				return;
+			}
+			switch (e.getKeyCode()) {
+				case KeyEvent.VK_1: selectedZombie = ZombieType.BASIC; break;
+				case KeyEvent.VK_2: selectedZombie = ZombieType.FAST; break;
+				case KeyEvent.VK_3: selectedZombie = ZombieType.TANK; break;
+				default: return;
+			}
+			repaint();
 		}
 
 		@Override
